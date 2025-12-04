@@ -1,4 +1,5 @@
 File Structure: 
+```
 Salesforce MCP/
 │
 ├── backend/
@@ -60,4 +61,4 @@ Salesforce MCP/
 ├── .env                                 # Environment variables
 ├── requirements.txt                     # Python dependencies
 ├── README.md                            # Documentation
-└── docker-compose.yml                   # Optional: containerization
+```
