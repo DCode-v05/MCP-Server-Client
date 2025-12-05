@@ -58,25 +58,28 @@ class Chat:
         """
         await self._process_user_query(query)
 
+        # 1) Collect all available tools
+        tools_schema = await ToolManager.get_all_tools_schema(self.mcp_clients)
+        
+        # 2) Call Gemini with history + tool schemas
+        response = await self.gemini_service.chat(
+            messages=self.messages,
+            tools_schema=tools_schema,
+        )
+        
+        # 3) Loop until we get a final text response
         while True:
-            # 1) Collect all available tools
-            tools_schema = await ToolManager.get_all_tools_schema(self.mcp_clients)
-            
-            # 2) Call Gemini with history + tool schemas
-            response = await self.gemini_service.chat(
-                messages=self.messages,
-                tools_schema=tools_schema,
-            )
-            
-            # 3) Inspect Gemini response for tool calls
+            # Inspect Gemini response for tool calls
             tool_calls = ToolManager.extract_tool_calls(response)
 
             # If NO tool calls → Model is done, extract final text
             if not tool_calls:
                 reply = self.gemini_service.extract_text(response)
-                if reply:  # Only add if there's actual text
+                if reply:
                     self.messages.append({"role": "model", "content": reply})
-                return reply if reply else "Task completed successfully."
+                    return reply
+                else:
+                    return "Task completed successfully."
 
             logger.info(f"Gemini requested tools: {tool_calls}")
 
@@ -86,18 +89,9 @@ class Chat:
                 tool_calls,
             )
             
-            # 5) Resume with tool results
+            # 5) Resume with tool results (this becomes the new response)
             response = await self.gemini_service.resume_with_tool_results(
                 messages=self.messages,
                 tool_response=tool_results,
                 tools_schema=tools_schema,
             )
-            
-            # 6) Extract text if any and add to history
-            reply = self.gemini_service.extract_text(response)
-            if reply:
-                self.messages.append({"role": "model", "content": reply})
-                
-            # Note: We don't return here even if there's text,
-            # because there might be more tool calls in the response.
-            # The loop will check at the top and handle accordingly.
